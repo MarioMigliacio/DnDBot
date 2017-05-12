@@ -4,6 +4,21 @@ using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
+using System;
+using DnD.Dice;
+using DnD.Classes.HeroSkills;
+using DnD.Classes.HeroFeats;
+using DnD.Classes.CharacterClasses;
+using DnD.Classes.HeroSpecials;
+using DnD.Classes.Player;
+using DnD.Enums.Alignment;
+using DnD.Enums.ClassFeats;
+using DnD.Enums.ClassSkills;
+using DnD.Enums.ClassSpecials;
+using DnD.Enums.ClassTypes;
+using DnD.Enums.Races;
+using DnD.Enums.SavingThrows;
+using DnD.Enums.Stats;
 
 namespace DnDBot
 {
@@ -18,14 +33,17 @@ namespace DnDBot
         {
             if (activity.Type == ActivityTypes.Message)
             {
-                await Conversation.SendAsync(activity, () => new Dialogs.RootDialog());
+                await Conversation.SendAsync(activity, () => new MyLuisDialog());
             }
+
             else
             {
                 HandleSystemMessage(activity);
             }
+
             var response = Request.CreateResponse(HttpStatusCode.OK);
-            return response;
+
+            return response;            
         }
 
         private Activity HandleSystemMessage(Activity message)
