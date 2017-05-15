@@ -1,17 +1,9 @@
-﻿using Microsoft.Bot.Builder.Dialogs;
-using Microsoft.Bot.Builder.Luis;
-using Microsoft.Bot.Builder.Luis.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Web;
-using DnD.Dice;
-using DnD.Classes.HeroSkills;
+﻿using DnD.Classes.CharacterClasses;
 using DnD.Classes.HeroFeats;
-using DnD.Classes.CharacterClasses;
+using DnD.Classes.HeroSkills;
 using DnD.Classes.HeroSpecials;
 using DnD.Classes.Player;
+using DnD.Dice;
 using DnD.Enums.Alignment;
 using DnD.Enums.ClassFeats;
 using DnD.Enums.ClassSkills;
@@ -20,6 +12,14 @@ using DnD.Enums.ClassTypes;
 using DnD.Enums.Races;
 using DnD.Enums.SavingThrows;
 using DnD.Enums.Stats;
+using Microsoft.Bot.Builder.Dialogs;
+using Microsoft.Bot.Builder.Luis;
+using Microsoft.Bot.Builder.Luis.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Web;
 
 namespace DnDBot
 {
