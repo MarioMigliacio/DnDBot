@@ -19,9 +19,19 @@ namespace DnDBot.HeroInformation
         public static Hero GetHero { get; set; }
 
         /// <summary>
+        /// A static property which can be called to save player Name preferences.
+        /// </summary>
+        public static string Name { get; set; } = null;
+
+        /// <summary>
+        /// A static property which can be called to save player Gender preferences.
+        /// </summary>
+        public static string Gender { get; set; } = null;
+
+        /// <summary>
         /// A static property which can be called to save player Race preferences.
         /// </summary>
-        public static RaceType DesiredRace { get; set; } = RaceType.None;
+        public static Alignment DesiredAlign { get; set; } = Alignment.None;
 
         /// <summary>
         /// A static property which can be called to save player Class Type preferences.
@@ -31,21 +41,11 @@ namespace DnDBot.HeroInformation
         /// <summary>
         /// A static property which can be called to save player Race preferences.
         /// </summary>
-        public static Alignment DesiredAlign { get; set; } = Alignment.None;
+        public static RaceType DesiredRace { get; set; } = RaceType.None;
 
         /// <summary>
         /// A static property which can be called to save player Stats.
         /// </summary>
-        public static Dictionary<Stats, int> StatsContainer { get; set; } = new Dictionary<Stats, int>();
-        
-        /// <summary>
-        /// A static property which can be called to save player Name preferences.
-        /// </summary>
-        public static string Name { get; set; } = null;
-
-        /// <summary>
-        /// A static property which can be called to save player Gender preferences.
-        /// </summary>
-        public static string Gender { get; set; } = null;
+        public static Dictionary<Stats, int> StatsContainer { get; set; } = new Dictionary<Stats, int>();        
     }
 }
