@@ -12,6 +12,7 @@ using DnD.Enums.ClassTypes;
 using DnD.Enums.Races;
 using DnD.Enums.SavingThrows;
 using DnD.Enums.Stats;
+using DnD.UserStrings;
 using DnDBot.HeroInformation;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Luis;
@@ -40,7 +41,9 @@ namespace DnDBot
         private List<string> _alignOptions = new List<string>();
         private List<string> _classOptions = new List<string>();
         private List<string> _statOptions = new List<string>();
+        private List<string> _skillOptions = new List<string>();
         private Queue<int> _statRolls = new Queue<int>();
+        private string _lastSkillSelected = string.Empty;
 
         #region Player Default Intent
 
@@ -69,23 +72,51 @@ namespace DnDBot
             if (await result)
             {
                 // ensure the hero is in a good state for building off of: default all the properties and collections.
-                Player.GetHero = null;
-                Player.Name = null;
-                Player.Gender = null;
-                Player.DesiredAlign = Alignment.None;
-                Player.DesiredClass = ClassType.None;
-                Player.DesiredRace = RaceType.None;
-                Player.StatsContainer = new Dictionary<Stats, int>();
+                //Player.GetHero = null;
+                //Player.Name = null;
+                //Player.Gender = null;
+                //Player.DesiredAlign = Alignment.None;
+                //Player.DesiredClass = ClassType.None;
+                //Player.DesiredRace = RaceType.None;
+                //Player.StatsContainer = new Dictionary<Stats, int>();
+                //PlayerFeats.FeatsContainer = new List<BaseFeat>();
+                //PlayerSkills.SkillsContainer = new List<BaseSkill>();
+
+                //_name = string.Empty;
+                //_gender = string.Empty;
+                //_raceOptions = new List<string>();
+                //_alignOptions = new List<string>();
+                //_classOptions = new List<string>();
+                //_statOptions = new List<string>();
+                //_skillOptions = new List<string>();
+                //_statRolls = new Queue<int>();
+                
+                // for testing.
+                Player.Name = "mario";
+                Player.Gender = "male";
+                Player.DesiredAlign = Alignment.ChaoticEvil;
+                Player.DesiredClass = ClassType.Barbarian;
+                Player.DesiredRace = RaceType.HalfOrc;
+                Player.StatsContainer = new Dictionary<Stats, int>
+                {
+                    { Stats.Charisma, 10 },
+                    { Stats.Constitution, 10 },
+                    { Stats.Dexterity, 10 },
+                    { Stats.Intellect, 10 },
+                    { Stats.Strength, 10 },
+                    { Stats.Wisdom, 10 }
+                };
                 PlayerFeats.FeatsContainer = new List<BaseFeat>();
                 PlayerSkills.SkillsContainer = new List<BaseSkill>();
 
-                _name = string.Empty;
-                _gender = string.Empty;
-                _raceOptions = new List<string>();
-                _alignOptions = new List<string>();
-                _classOptions = new List<string>();
-                _statOptions = new List<string>();
-                _statRolls = new Queue<int>();
+                _name = Player.Name;
+                _gender = Player.Gender;
+                //_raceOptions = new List<string>();
+                //_alignOptions = new List<string>();
+                //_classOptions = new List<string>();
+                //_statOptions = new List<string>();
+                //_skillOptions = new List<string>();
+                //_statRolls = new Queue<int>();
 
                 await context.PostAsync("All the Properties of the hero have been reset to safe default values. Ready for your next input!");
             }
@@ -620,11 +651,111 @@ namespace DnDBot
         #endregion
 
         #region Player Skills Intent
+        
+        /// <summary>
+        /// This PlayerSkill method is called when LUIS recognizes the intent 'PlayerSkills' being called.
+        /// Intended usage: skill set. Accepting any of the <see cref="ClassSkills"/> enumeration fields.
+        /// This method also prompts a list of choices to lock in the selected skill.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("PlayerSkills")]
+        public async Task PlayerSkill(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("I recognized an intent to assign hero skills.");
 
-        // special note: we need to have the class, race, and stats done before we can look at Skills.
-        //PlayerSkills.PopulateContainer();
-        //Player.GetHero = Hero.GetStageTwoHero(DesiredClassType.DesiredClass, DesiredRaceType.DesiredRace, PlayerStats.StatsContainer);
+            // special note: we need to have the class, race, and stats done before we can look at Skills.
+            if (Player.DesiredAlign == Alignment.None ||
+                Player.DesiredClass == ClassType.None || Player.DesiredClass == ClassType.Caster ||
+                Player.DesiredRace == RaceType.None ||
+                Player.StatsContainer.Count != 6)
+            {
+                await context.PostAsync("In order to set skills, you must first fully set your hero's RACE, ALIGN, CLASS, and STATS.");
+                context.Wait(MessageReceived);
+            }
+            else
+            {
+                if (PlayerSkills.SkillsContainer.Count == 0)
+                {
+                    PlayerSkills.PopulateContainer();
+                }
 
+                if (_skillOptions.Count == 0)
+                {
+                    foreach (var skill in PlayerSkills.SkillsContainer)
+                    {
+                        _skillOptions.Add(skill.SkillType.ToString());
+                    }
+                }
+
+                Player.GetHero = Hero.GetStageTwoHero(Player.DesiredClass, Player.DesiredRace, Player.StatsContainer);
+
+                PromptOptions<string> options = new PromptOptions<string>(
+                    $"What skills would you like your hero to have? You have {Player.GetHero.SkillRanksAvailable} available points to spend.",
+                    "That was not a valid option.",
+                    "You are being silly!",
+                    _skillOptions,
+                    1);
+
+                PromptDialog.Choice(context, PlayerSkill_Dialog, options);
+            }
+        }
+
+        /// <summary>
+        /// This intermediate method accepts a string choice dialog from the user.
+        /// The PlayerSkill_Dialog method then forwards a YES/NO choice dialog
+        /// to the user confirming that this is the correct skill they want to add.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{string}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task PlayerSkill_Dialog(IDialogContext context, IAwaitable<string> result)
+        {
+            _lastSkillSelected = await result;
+            string description = SkillInformation.GetDescription(_lastSkillSelected);
+
+            await context.PostAsync($"{_lastSkillSelected} description:");
+            await context.PostAsync($"{description}");
+
+            PromptDialog.Confirm(context, PlayerSkill_AddSkill, $"Do you want to add a skill rank into {_lastSkillSelected}?");                    
+        }
+
+        /// <summary>
+        /// The actual setting of our Player objects' skills is done through this private asynchronous helper method.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{bool}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task PlayerSkill_AddSkill(IDialogContext context, IAwaitable<bool> result)
+        {
+            if (await result)
+            {
+                foreach (var skill in PlayerSkills.SkillsContainer)
+                {
+                    if (skill.SkillType.ToString() == _lastSkillSelected)
+                    {
+                        if (skill.NumberOfRanks < Player.GetHero.SkillCap && Player.GetHero.SkillRanksAvailable > 0)
+                        {
+                            skill.NumberOfRanks++;
+                            Player.GetHero.SkillRanksAvailable--;
+                            await context.PostAsync($"We have added a rank into {_lastSkillSelected}. Current ranks: {skill.NumberOfRanks}.");
+
+                            if (skill.NumberOfRanks == Player.GetHero.SkillCap)
+                            {
+                                _skillOptions.Remove(_lastSkillSelected);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                await context.PostAsync($"Ok, we wont add any skill ranks into {_lastSkillSelected}.");
+            }
+
+            context.Wait(MessageReceived);
+        }
 
         #endregion
 
@@ -717,40 +848,30 @@ namespace DnDBot
         public async Task DisplayInfo(IDialogContext context, LuisResult result)
         {
             await context.PostAsync("Your hero has the following properties set:");
-            // TESTING PURPOSES. WORKS
-            //Player.StatsContainer = new Dictionary<Stats, int>
-            //{
-            //    { Stats.Charisma, 10 },
-            //    { Stats.Constitution, 10 },
-            //    { Stats.Dexterity, 10 },
-            //    { Stats.Intellect, 10 },
-            //    { Stats.Strength, 10 },
-            //    { Stats.Wisdom, 10 }
-            //};
 
             if (Player.Name != null)
             {
-                await context.PostAsync($"Name: {Player.Name}");
+                await context.PostAsync($"Name: {Player.Name}.");
             }
 
             if (Player.Gender != null)
             {
-                await context.PostAsync($"Gender: {Player.Gender}");
+                await context.PostAsync($"Gender: {Player.Gender}.");
             }
 
             if (Player.DesiredAlign != Alignment.None)
             {
-                await context.PostAsync($"Alignment: {Player.DesiredAlign}");
+                await context.PostAsync($"Alignment: {Player.DesiredAlign}.");
             }
 
             if (Player.DesiredRace != RaceType.None)
             {
-                await context.PostAsync($"Race: {Player.DesiredRace}");
+                await context.PostAsync($"Race: {Player.DesiredRace}.");
             }
 
             if (Player.DesiredClass != ClassType.None && Player.DesiredClass != ClassType.Caster)
             {
-                await context.PostAsync($"Class: {Player.DesiredClass}");
+                await context.PostAsync($"Class: {Player.DesiredClass}.");
             }
 
             if (Player.StatsContainer.Count == 6)
@@ -760,20 +881,29 @@ namespace DnDBot
 
                 foreach (var stat in Player.StatsContainer)
                 {
-                    sb.AppendLine($"{stat.Key}: {stat.Value}");
+                    sb.AppendLine($"{stat.Key}: {stat.Value}.");
                 }
 
                 await context.PostAsync(sb.ToString());
             }
 
+            if (PlayerSkills.SkillsContainer.Count != 0)
+            {
+                await context.PostAsync($"Players' Skills:");
+                StringBuilder sb = new StringBuilder();
+
+                foreach (var skill in PlayerSkills.SkillsContainer)
+                {
+                    if (skill.NumberOfRanks > 0)
+                    {
+                        sb.AppendLine($"{skill.SkillType.ToString()}: {skill.NumberOfRanks}.");
+                    }
+                }
+            }
+
             if (PlayerFeats.FeatsContainer.Count != 0)
             {
                 await context.PostAsync("insert feats message here later.");
-            }
-
-            if (PlayerSkills.SkillsContainer.Count != 0)
-            {
-                await context.PostAsync("insert skills message here later.");
             }
 
             context.Wait(MessageReceived);
