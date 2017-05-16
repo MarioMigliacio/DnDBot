@@ -35,13 +35,13 @@ namespace DnDBot
     {
         private string _name = string.Empty;
         private string _gender = string.Empty;
-        private List<string> _genderOptions = new List<string>(new string[] { "male", "female", "other", "unknown" });
+        private readonly List<string> _genderOptions = new List<string>(new string[] { "male", "female", "other", "unknown" });
         private List<string> _raceOptions = new List<string>();
         private List<string> _alignOptions = new List<string>();
         private List<string> _classOptions = new List<string>();
         private List<string> _statOptions = new List<string>();
         private Queue<int> _statRolls = new Queue<int>();
-        
+
         #region Player Default Intent
 
         /// <summary>
@@ -78,6 +78,14 @@ namespace DnDBot
                 Player.StatsContainer = new Dictionary<Stats, int>();
                 PlayerFeats.FeatsContainer = new List<BaseFeat>();
                 PlayerSkills.SkillsContainer = new List<BaseSkill>();
+
+                _name = string.Empty;
+                _gender = string.Empty;
+                _raceOptions = new List<string>();
+                _alignOptions = new List<string>();
+                _classOptions = new List<string>();
+                _statOptions = new List<string>();
+                _statRolls = new Queue<int>();
 
                 await context.PostAsync("All the Properties of the hero have been reset to safe default values. Ready for your next input!");
             }
@@ -426,58 +434,77 @@ namespace DnDBot
         {
             await context.PostAsync("I recognized an intent to roll hero stats.");
 
+            if (Player.StatsContainer.Count == 6)
+            {
+                await context.PostAsync("You have already finished this process! (use 'new' command to wipe all information)");
+            }
+
             int sum = 0;
             List<int> storage = new List<int>();
 
-            for (int i = 0; i < 6; i++)
+            if ((_statRolls.Count == 0 || _statRolls.Count == 6) && Player.StatsContainer.Count != 6)
             {
-                storage.Clear();
-                storage.Add(Dice.D6);
-                storage.Add(Dice.D6);
-                storage.Add(Dice.D6);
-                storage.Add(Dice.D6);
-                storage.Sort();     // special note: List.Sort() does ascending order. Rolling stats takes the best 3 of 4 rolls.
-                sum = storage[3] + storage[2] + storage[1];
-                _statRolls.Enqueue(sum);
+                _statRolls = new Queue<int>();
+
+                for (int i = 0; i < 6; i++)
+                {
+                    storage.Clear();
+                    storage.Add(Dice.D6);
+                    storage.Add(Dice.D6);
+                    storage.Add(Dice.D6);
+                    storage.Add(Dice.D6);
+                    storage.Sort();     // special note: List.Sort() does ascending order. Rolling stats takes the best 3 of 4 rolls.
+                    sum = storage[3] + storage[2] + storage[1];
+                    _statRolls.Enqueue(sum);
+                }
             }
 
             StringBuilder rolls = new StringBuilder();
 
-            foreach (int roll in _statRolls)
+            if (_statRolls.Count > 0)
             {
-                rolls.AppendLine($" {roll} ");
-            }
+                foreach (int roll in _statRolls)
+                {
+                    rolls.AppendLine($" {roll} ");
+                }
 
-            PromptDialog.Confirm(context, PlayerStats_Dialog, $"Would you like to keep the following rolls: {rolls}");
+                PromptDialog.Confirm(context, PlayerStats_Dialog, $"Continue with the following rolls: {rolls}");
+            }
+            else
+            {
+                context.Wait(MessageReceived);
+            }            
         }
 
         private async Task PlayerStats_Dialog(IDialogContext context, IAwaitable<bool> result)
         {
-            foreach (Stats stat in Enum.GetValues(typeof(Stats)))
-            {
-                _statOptions.Add(stat.ToString());                
-            }
-
             if (await result)
             {
-                while(Player.StatsContainer.Count < 6)
+                if (_statOptions.Count == 0)
                 {
-                    PromptOptions<string> options = new PromptOptions<string>(
-                    $"Where would you like to allocate the {_statRolls.Peek()}?",
-                    "That was not a valid option.",
-                    "You are being silly!",
-                    _statOptions,
-                    1);
-
-                    PromptDialog.Choice(context, PlayerStat_Allocation, options);
+                    foreach (Stats stat in Enum.GetValues(typeof(Stats)))
+                    {
+                        _statOptions.Add(stat.ToString());
+                    }
                 }
+
+                PromptOptions<string> options = new PromptOptions<string>(
+                $"Where would you like to allocate the {_statRolls.Peek()}?",
+                "That was not a valid option.",
+                "You are being silly!",
+                _statOptions,
+                1);
+
+                PromptDialog.Choice(context, PlayerStat_Allocation, options);                
             }
             else
             {
-
+                await context.PostAsync("Ok, clearing any currently set Stats.");
+                Player.StatsContainer.Clear();
+                _statRolls.Clear();
+                _statOptions.Clear();
+                context.Wait(MessageReceived);
             }
-
-            context.Wait(MessageReceived);
         }
 
         private async Task PlayerStat_Allocation(IDialogContext context, IAwaitable<string> result)
@@ -490,7 +517,9 @@ namespace DnDBot
                 {
                     if (!Player.StatsContainer.ContainsKey(Stats.Charisma))
                     {
-                        Player.StatsContainer[Stats.Charisma] = _statRolls.Dequeue();
+                        Player.StatsContainer.Add(Stats.Charisma, _statRolls.Dequeue());
+                        _statOptions.Remove("Charisma");
+                        await context.PostAsync($"Allocation complete. Charisma: {Player.StatsContainer[Stats.Charisma]}.");
                     }
                     else
                     {
@@ -502,7 +531,9 @@ namespace DnDBot
                 {
                     if (!Player.StatsContainer.ContainsKey(Stats.Constitution))
                     {
-                        Player.StatsContainer[Stats.Constitution] = _statRolls.Dequeue();
+                        Player.StatsContainer.Add(Stats.Constitution, _statRolls.Dequeue());
+                        _statOptions.Remove("Constitution");
+                        await context.PostAsync($"Allocation complete. Constitution: {Player.StatsContainer[Stats.Constitution]}.");
                     }
                     else
                     {
@@ -514,7 +545,9 @@ namespace DnDBot
                 {
                     if (!Player.StatsContainer.ContainsKey(Stats.Dexterity))
                     {
-                        Player.StatsContainer[Stats.Dexterity] = _statRolls.Dequeue();
+                        Player.StatsContainer.Add(Stats.Dexterity, _statRolls.Dequeue());
+                        _statOptions.Remove("Dexterity");
+                        await context.PostAsync($"Allocation complete. Dexterity: {Player.StatsContainer[Stats.Dexterity]}.");
                     }
                     else
                     {
@@ -526,7 +559,9 @@ namespace DnDBot
                 {
                     if (!Player.StatsContainer.ContainsKey(Stats.Intellect))
                     {
-                        Player.StatsContainer[Stats.Intellect] = _statRolls.Dequeue();
+                        Player.StatsContainer.Add(Stats.Intellect, _statRolls.Dequeue());
+                        _statOptions.Remove("Intellect");
+                        await context.PostAsync($"Allocation complete. Intellect: {Player.StatsContainer[Stats.Intellect]}.");
                     }
                     else
                     {
@@ -538,7 +573,9 @@ namespace DnDBot
                 {
                     if (!Player.StatsContainer.ContainsKey(Stats.Strength))
                     {
-                        Player.StatsContainer[Stats.Strength] = _statRolls.Dequeue();
+                        Player.StatsContainer.Add(Stats.Strength, _statRolls.Dequeue());
+                        _statOptions.Remove("Strength");
+                        await context.PostAsync($"Allocation complete. Strength: {Player.StatsContainer[Stats.Strength]}.");
                     }
                     else
                     {
@@ -550,7 +587,9 @@ namespace DnDBot
                 {
                     if (!Player.StatsContainer.ContainsKey(Stats.Wisdom))
                     {
-                        Player.StatsContainer[Stats.Wisdom] = _statRolls.Dequeue();
+                        Player.StatsContainer.Add(Stats.Wisdom, _statRolls.Dequeue());
+                        _statOptions.Remove("Wisdom");
+                        await context.PostAsync($"Allocation complete. Wisdom: {Player.StatsContainer[Stats.Wisdom]}.");
                     }
                     else
                     {
@@ -558,11 +597,11 @@ namespace DnDBot
                     }
                     break;
                 }
+                default: await context.PostAsync("You must select a valid Stat!"); break;
             }
 
             context.Wait(MessageReceived);
         }
-
 
         #endregion
 
@@ -621,7 +660,7 @@ namespace DnDBot
 
             if (Player.StatsContainer.Count < 6)
             {
-                await context.PostAsync("The Players Stats must be set. Use the command 'rollstats' to walk through this process.");
+                await context.PostAsync("The Players Stats must be set. Use the command 'roll stats' to walk through this process.");
             }
 
             if (PlayerFeats.FeatsContainer.Count == 0)
