@@ -38,7 +38,8 @@ namespace DnDBot
         List<string> genderOptions = new List<string>(new string[] { "male", "female", "other", "unknown" });
         List<string> raceOptions = new List<string>();
         List<string> alignOptions = new List<string>();
-
+        List<string> classOptions = new List<string>();
+        
         #region Player Default Intent
 
         /// <summary>
@@ -333,6 +334,81 @@ namespace DnDBot
 
         #endregion
 
+        #region Player Class Intent
+
+        /// <summary>
+        /// This PlayerClass method is called when LUIS recognizes the intent 'PlayerClass' being called.
+        /// Intended usage: class set. Accepting any of the <see cref="ClassType"/> enumeration fields except 'None' and 'Caster'.
+        /// This method also prompts a list of choices to lock in the selected class.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("PlayerClass")]
+        public async Task PlayerClass(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("I recognized an intent to assign hero class.");
+
+            foreach (ClassType classtype in Enum.GetValues(typeof(ClassType)))
+            {
+                if (classtype != ClassType.None && classtype != ClassType.Caster)
+                {
+                    classOptions.Add(classtype.ToString());
+                }
+            }
+
+            PromptOptions<string> options = new PromptOptions<string>(
+                "What alignment would you like your hero to be associated with.",
+                "That was not a valid option.",
+                "You are being silly!",
+                classOptions,
+                2);
+
+            PromptDialog.Choice(context, PlayerClass_Dialog, options);
+        }
+
+        /// <summary>
+        /// The actual setting of our Player objects' class is done through this private asynchronous helper method.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{string}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task PlayerClass_Dialog(IDialogContext context, IAwaitable<string> result)
+        {
+            string input = await result;
+            ClassType classtype = ClassType.None;
+
+            switch (input)
+            {
+                case "Barbarian": classtype = ClassType.Barbarian; break;
+                case "Bard": classtype = ClassType.Bard; break;
+                case "Cleric": classtype = ClassType.Cleric; break;
+                case "Druid": classtype = ClassType.Druid; break;
+                case "Fighter": classtype = ClassType.Fighter; break;
+                case "Monk": classtype = ClassType.Monk; break;
+                case "Paladin": classtype = ClassType.Paladin; break;
+                case "Ranger": classtype = ClassType.Ranger; break;
+                case "Rogue": classtype = ClassType.Rogue; break;
+                case "Sorcerer": classtype = ClassType.Sorcerer; break;
+                case "Wizard": classtype = ClassType.Wizard; break;
+                default: classtype = ClassType.None; break;
+            }
+
+            if (classtype != ClassType.None)
+            {
+                Player.DesiredClass = classtype;
+                await context.PostAsync($"So your desired class: '{Player.DesiredClass}' has been set successfully.");
+            }
+            else
+            {
+                await context.PostAsync($"The class option: {classtype} was incorrect, please use one of the options.");
+            }
+
+            context.Wait(MessageReceived);
+        }
+
+        #endregion
+
         #region Player Help Intent
 
         /// <summary>
@@ -343,8 +419,9 @@ namespace DnDBot
         /// <returns>Method awaits the completion of the Posting process.</returns>
         [LuisIntent("Help")]
         public async Task HelpProcess(IDialogContext context, LuisResult result)
-        {            
-            await context.PostAsync("Lets start from these basic hero fundamentals: (you can use 'show' anytime to display currently set fields)");
+        {
+            await context.PostAsync("You can use 'show' anytime to display currently set fields");
+            await context.PostAsync("Lets start from these basic hero fundamentals:");
 
             if (Player.Name == null)
             {
@@ -407,7 +484,77 @@ namespace DnDBot
 
         #region Info Intent
 
+        /// <summary>
+        /// The DisplayInfo method is fired when LUIS recognizes terms pertinant to the Info Intent.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("Info")]
+        public async Task DisplayInfo(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("Your hero has the following properties set:");
+            // TESTING PURPOSES. WORKS
+            //Player.StatsContainer = new Dictionary<Stats, int>
+            //{
+            //    { Stats.Charisma, 10 },
+            //    { Stats.Constitution, 10 },
+            //    { Stats.Dexterity, 10 },
+            //    { Stats.Intellect, 10 },
+            //    { Stats.Strength, 10 },
+            //    { Stats.Wisdom, 10 }
+            //};
 
+            if (Player.Name != null)
+            {
+                await context.PostAsync($"Name: {Player.Name}");
+            }
+
+            if (Player.Gender != null)
+            {
+                await context.PostAsync($"Gender: {Player.Gender}");
+            }
+
+            if (Player.DesiredAlign != Alignment.None)
+            {
+                await context.PostAsync($"Alignment: {Player.DesiredAlign}");
+            }
+
+            if (Player.DesiredRace != RaceType.None)
+            {
+                await context.PostAsync($"Race: {Player.DesiredRace}");
+            }
+
+            if (Player.DesiredClass != ClassType.None && Player.DesiredClass != ClassType.Caster)
+            {
+                await context.PostAsync($"Class: {Player.DesiredClass}");
+            }
+
+            if (Player.StatsContainer.Count == 6)
+            {
+                await context.PostAsync($"Players' Stats:");
+                StringBuilder sb = new StringBuilder();
+
+                foreach (var stat in Player.StatsContainer)
+                {
+                    sb.AppendLine($"{stat.Key}: {stat.Value}");
+                }
+
+                await context.PostAsync(sb.ToString());
+            }
+
+            if (PlayerFeats.FeatsContainer.Count != 0)
+            {
+                await context.PostAsync("insert feats message here later.");
+            }
+
+            if (PlayerSkills.SkillsContainer.Count != 0)
+            {
+                await context.PostAsync("insert skills message here later.");
+            }
+
+            context.Wait(MessageReceived);
+        }
 
         #endregion
     }
