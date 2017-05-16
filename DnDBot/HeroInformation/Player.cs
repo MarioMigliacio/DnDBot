@@ -16,7 +16,7 @@ namespace DnDBot.HeroInformation
         /// <summary>
         /// Allows access to the Hero being assembled thus far.
         /// </summary>
-        public static Hero GetHero { get; set; }
+        public static Hero GetHero { get; set; } = null;
 
         /// <summary>
         /// A static property which can be called to save player Name preferences.

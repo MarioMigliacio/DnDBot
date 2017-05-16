@@ -681,6 +681,7 @@ namespace DnDBot
                 {
                     PlayerSkills.PopulateContainer();
                     Player.GetHero = Hero.GetStageTwoHero(Player.DesiredClass, Player.DesiredRace, Player.StatsContainer);
+                    Player.GetHero.SkillRanksAvailable = 2;
                 }
 
                 if (_skillOptions.Count == 0)
@@ -815,14 +816,14 @@ namespace DnDBot
                 await context.PostAsync("The Players Stats must be set. Use the command 'roll stats' to walk through this process.");
             }
 
+            if (Player.GetHero == null || Player.GetHero.SkillRanksAvailable > 0)
+            {
+                await context.PostAsync("The Players Skills must be set. Use the command 'skill set' to walk through this process.");
+            }
+
             if (PlayerFeats.FeatsContainer.Count == 0)
             {
                 await context.PostAsync("The Players Feats must be set. Use the command 'feat set' to walk through this process.");
-            }
-
-            if (PlayerSkills.SkillsContainer.Count == 0)
-            {
-                await context.PostAsync("The Players Skills must be set. Use the command 'skill set' to walk through this process.");
             }
             
             context.Wait(MessageReceived);
