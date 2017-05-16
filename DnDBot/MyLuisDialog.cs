@@ -681,7 +681,6 @@ namespace DnDBot
                 {
                     PlayerSkills.PopulateContainer();
                     Player.GetHero = Hero.GetStageTwoHero(Player.DesiredClass, Player.DesiredRace, Player.StatsContainer);
-                    Player.GetHero.SkillRanksAvailable = 2;
                 }
 
                 if (_skillOptions.Count == 0)
@@ -748,13 +747,137 @@ namespace DnDBot
                         {
                             skill.NumberOfRanks++;
                             Player.GetHero.SkillRanksAvailable--;
-                            await context.PostAsync($"We have added a rank into {_lastSkillSelected}. Current ranks: {skill.NumberOfRanks}.");
+                            await context.PostAsync($"We have added a rank into {_lastSkillSelected}. Current ranks: {skill.NumberOfRanks}. You have {Player.GetHero.SkillRanksAvailable} skill ranks left.");
 
                             if (skill.NumberOfRanks == Player.GetHero.SkillCap)
                             {
                                 _skillOptions.Remove(_lastSkillSelected);
                             }
                         }
+
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                await context.PostAsync($"Ok, we wont add any skill ranks into {_lastSkillSelected}.");
+            }
+
+            context.Wait(MessageReceived);
+        }
+
+        #endregion
+
+        #region Place Multiple Skills Intent
+
+        /// <summary>
+        /// This MultiplePlayerSkills method is called when LUIS recognizes the intent 'PlaceMultipleSkills' being called.
+        /// Intended usage: place multiple. Accepting any of the <see cref="ClassSkills"/> enumeration fields.
+        /// This method also prompts a list of choices to lock in the selected skill.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("PlaceMultipleSkills")]
+        public async Task MultiplePlayerSkills(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("I recognized an intent to assign 4 hero skills at once.");
+
+            // special note: we need to have the class, race, and stats done before we can look at Skills.
+            if (Player.DesiredAlign == Alignment.None ||
+                Player.DesiredClass == ClassType.None || Player.DesiredClass == ClassType.Caster ||
+                Player.DesiredRace == RaceType.None ||
+                Player.StatsContainer.Count != 6)
+            {
+                await context.PostAsync("In order to set skills, you must first fully set your hero's RACE, ALIGN, CLASS, and STATS.");
+                context.Wait(MessageReceived);
+            }
+            else
+            {
+                if (PlayerSkills.SkillsContainer.Count == 0)
+                {
+                    PlayerSkills.PopulateContainer();
+                    Player.GetHero = Hero.GetStageTwoHero(Player.DesiredClass, Player.DesiredRace, Player.StatsContainer);
+                }
+
+                if (_skillOptions.Count == 0)
+                {
+                    foreach (var skill in PlayerSkills.SkillsContainer)
+                    {
+                        _skillOptions.Add(skill.SkillType.ToString());
+                    }
+                }
+
+                if (Player.GetHero.SkillRanksAvailable >= 4)
+                {
+                    PromptOptions<string> options = new PromptOptions<string>(
+                        $"What skills would you like your hero to have? You have {Player.GetHero.SkillRanksAvailable} available point(s) to spend.",
+                        "That was not a valid option.",
+                        "You are being silly!",
+                        _skillOptions,
+                        1);
+
+                    PromptDialog.Choice(context, MultiplePlayerSkill_Dialog, options);
+                }
+                else
+                {
+                    await context.PostAsync($"You dont have enough skill ranks to place multiple (need 4, have: {Player.GetHero.SkillRanksAvailable}). (use 'new' command to wipe all information)");
+                    context.Wait(MessageReceived);
+                }
+            }
+        }
+
+        /// <summary>
+        /// This intermediate method accepts a string choice dialog from the user.
+        /// The MultiplePlayerSkill_Dialog method then forwards a YES/NO choice dialog
+        /// to the user confirming that this is the correct skill they want to add.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{string}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task MultiplePlayerSkill_Dialog(IDialogContext context, IAwaitable<string> result)
+        {
+            _lastSkillSelected = await result;
+            string description = SkillInformation.GetDescription(_lastSkillSelected);
+
+            await context.PostAsync($"{_lastSkillSelected} description:");
+            await context.PostAsync($"{description}");
+
+            PromptDialog.Confirm(context, MultiplePlayerSkill_AddSkill, $"Do you want to add 4 skill ranks into {_lastSkillSelected}?");
+        }
+
+        /// <summary>
+        /// The actual setting of our Player objects' skills is done through this private asynchronous helper method.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{bool}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task MultiplePlayerSkill_AddSkill(IDialogContext context, IAwaitable<bool> result)
+        {
+            if (await result)
+            {
+                foreach (var skill in PlayerSkills.SkillsContainer)
+                {
+                    if (skill.SkillType.ToString() == _lastSkillSelected)
+                    {
+                        if (skill.NumberOfRanks == 0 && Player.GetHero.SkillRanksAvailable >= 4)
+                        {
+                            skill.NumberOfRanks += 4;
+                            Player.GetHero.SkillRanksAvailable -= 4;
+                            await context.PostAsync($"We have added 4 ranks into {_lastSkillSelected}. Current ranks: {skill.NumberOfRanks}. You have {Player.GetHero.SkillRanksAvailable} skill ranks left.");
+
+                            if (skill.NumberOfRanks == Player.GetHero.SkillCap)
+                            {
+                                _skillOptions.Remove(_lastSkillSelected);
+                            }
+                        }
+                        else
+                        {
+                            await context.PostAsync($"We cant place 4 ranks into {_lastSkillSelected} because that would exceed the maximum allowed at this level.");
+                        }
+
+                        break;
                     }
                 }
             }
