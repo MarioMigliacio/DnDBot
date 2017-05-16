@@ -476,6 +476,14 @@ namespace DnDBot
             }            
         }
 
+        /// <summary>
+        /// This intermediate method accepts a YES/NO Confirmation dialog from the user.
+        /// The PlayerStats_Dialog method then forwards which possible choices are left for 
+        /// the user to allocate stats into through the use of a Choice Dialog.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{bool}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
         private async Task PlayerStats_Dialog(IDialogContext context, IAwaitable<bool> result)
         {
             if (await result)
@@ -507,6 +515,12 @@ namespace DnDBot
             }
         }
 
+        /// <summary>
+        /// The actual setting of our Player objects' stats is done through this private asynchronous helper method.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{string}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
         private async Task PlayerStat_Allocation(IDialogContext context, IAwaitable<string> result)
         {
             string input = await result;
@@ -617,7 +631,6 @@ namespace DnDBot
         #region Player Feats Intent
         // special note: we can only do Feats if we have done Skills. 
         #endregion
-
 
         #region Player Help Intent
 
