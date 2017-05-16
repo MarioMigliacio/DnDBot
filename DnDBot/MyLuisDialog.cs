@@ -35,10 +35,12 @@ namespace DnDBot
     {
         private string _name = string.Empty;
         private string _gender = string.Empty;
-        List<string> genderOptions = new List<string>(new string[] { "male", "female", "other", "unknown" });
-        List<string> raceOptions = new List<string>();
-        List<string> alignOptions = new List<string>();
-        List<string> classOptions = new List<string>();
+        private List<string> _genderOptions = new List<string>(new string[] { "male", "female", "other", "unknown" });
+        private List<string> _raceOptions = new List<string>();
+        private List<string> _alignOptions = new List<string>();
+        private List<string> _classOptions = new List<string>();
+        private List<string> _statOptions = new List<string>();
+        private Queue<int> _statRolls = new Queue<int>();
         
         #region Player Default Intent
 
@@ -159,8 +161,8 @@ namespace DnDBot
                 "What gender would you like your hero to be.",
                 "That was not a valid option.",
                 "You are being silly!",
-                genderOptions,
-                2);
+                _genderOptions,
+                1);
 
             PromptDialog.Choice(context, PlayerGender_Dialog, options);
         }
@@ -175,7 +177,7 @@ namespace DnDBot
         {
             string genders = await result;
 
-            if (genderOptions.Contains(genders))
+            if (_genderOptions.Contains(genders))
             {
                 Player.Gender = genders;
                 await context.PostAsync($"So your desired gender: '{Player.Gender}' has been set successfully.");
@@ -209,7 +211,7 @@ namespace DnDBot
             {
                 if (race != RaceType.None)
                 {
-                    raceOptions.Add(race.ToString());
+                    _raceOptions.Add(race.ToString());
                 }
             }
             
@@ -217,8 +219,8 @@ namespace DnDBot
                 "What race would you like your hero to be.",
                 "That was not a valid option.",
                 "You are being silly!",
-                raceOptions,
-                2);
+                _raceOptions,
+                1);
 
             PromptDialog.Choice(context, PlayerRace_Dialog, options);
         }
@@ -280,7 +282,7 @@ namespace DnDBot
             {
                 if (align != Alignment.None)
                 {
-                    alignOptions.Add(align.ToString());
+                    _alignOptions.Add(align.ToString());
                 }
             }
 
@@ -288,8 +290,8 @@ namespace DnDBot
                 "What alignment would you like your hero to be associated with.",
                 "That was not a valid option.",
                 "You are being silly!",
-                alignOptions,
-                2);
+                _alignOptions,
+                1);
 
             PromptDialog.Choice(context, PlayerAlign_Dialog, options);
         }
@@ -353,7 +355,7 @@ namespace DnDBot
             {
                 if (classtype != ClassType.None && classtype != ClassType.Caster)
                 {
-                    classOptions.Add(classtype.ToString());
+                    _classOptions.Add(classtype.ToString());
                 }
             }
 
@@ -361,8 +363,8 @@ namespace DnDBot
                 "What alignment would you like your hero to be associated with.",
                 "That was not a valid option.",
                 "You are being silly!",
-                classOptions,
-                2);
+                _classOptions,
+                1);
 
             PromptDialog.Choice(context, PlayerClass_Dialog, options);
         }
@@ -408,6 +410,175 @@ namespace DnDBot
         }
 
         #endregion
+
+        #region Player RollStats Intent
+
+        /// <summary>
+        /// This PlayerStats method is called when LUIS recognizes the intent 'RollStats' being called.
+        /// Intended usage: roll stats. Uses the Static <see cref="Dice"/> object to roll the <see cref="Player.StatsContainer"/> fields.
+        /// This method also prompts a yes/no whether or not the user wants to keep the selected rolls.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("RollStats")]
+        public async Task PlayerStats(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("I recognized an intent to roll hero stats.");
+
+            int sum = 0;
+            List<int> storage = new List<int>();
+
+            for (int i = 0; i < 6; i++)
+            {
+                storage.Clear();
+                storage.Add(Dice.D6);
+                storage.Add(Dice.D6);
+                storage.Add(Dice.D6);
+                storage.Add(Dice.D6);
+                storage.Sort();     // special note: List.Sort() does ascending order. Rolling stats takes the best 3 of 4 rolls.
+                sum = storage[3] + storage[2] + storage[1];
+                _statRolls.Enqueue(sum);
+            }
+
+            StringBuilder rolls = new StringBuilder();
+
+            foreach (int roll in _statRolls)
+            {
+                rolls.AppendLine($" {roll} ");
+            }
+
+            PromptDialog.Confirm(context, PlayerStats_Dialog, $"Would you like to keep the following rolls: {rolls}");
+        }
+
+        private async Task PlayerStats_Dialog(IDialogContext context, IAwaitable<bool> result)
+        {
+            foreach (Stats stat in Enum.GetValues(typeof(Stats)))
+            {
+                _statOptions.Add(stat.ToString());                
+            }
+
+            if (await result)
+            {
+                while(Player.StatsContainer.Count < 6)
+                {
+                    PromptOptions<string> options = new PromptOptions<string>(
+                    $"Where would you like to allocate the {_statRolls.Peek()}?",
+                    "That was not a valid option.",
+                    "You are being silly!",
+                    _statOptions,
+                    1);
+
+                    PromptDialog.Choice(context, PlayerStat_Allocation, options);
+                }
+            }
+            else
+            {
+
+            }
+
+            context.Wait(MessageReceived);
+        }
+
+        private async Task PlayerStat_Allocation(IDialogContext context, IAwaitable<string> result)
+        {
+            string input = await result;
+
+            switch (input)
+            {
+                case "Charisma":
+                {
+                    if (!Player.StatsContainer.ContainsKey(Stats.Charisma))
+                    {
+                        Player.StatsContainer[Stats.Charisma] = _statRolls.Dequeue();
+                    }
+                    else
+                    {
+                        await context.PostAsync($"You have already allocated a {Player.StatsContainer[Stats.Charisma]} for Charisma!");
+                    }
+                    break;
+                }              
+                case "Constitution":
+                {
+                    if (!Player.StatsContainer.ContainsKey(Stats.Constitution))
+                    {
+                        Player.StatsContainer[Stats.Constitution] = _statRolls.Dequeue();
+                    }
+                    else
+                    {
+                        await context.PostAsync($"You have already allocated a {Player.StatsContainer[Stats.Constitution]} for Constitution!");
+                    }
+                    break;
+                }
+                case "Dexterity":
+                {
+                    if (!Player.StatsContainer.ContainsKey(Stats.Dexterity))
+                    {
+                        Player.StatsContainer[Stats.Dexterity] = _statRolls.Dequeue();
+                    }
+                    else
+                    {
+                        await context.PostAsync($"You have already allocated a {Player.StatsContainer[Stats.Dexterity]} for Dexterity!");
+                    }
+                    break;
+                }
+                case "Intellect":
+                {
+                    if (!Player.StatsContainer.ContainsKey(Stats.Intellect))
+                    {
+                        Player.StatsContainer[Stats.Intellect] = _statRolls.Dequeue();
+                    }
+                    else
+                    {
+                        await context.PostAsync($"You have already allocated a {Player.StatsContainer[Stats.Intellect]} for Intellect!");
+                    }
+                    break;
+                }
+                case "Strength":
+                {
+                    if (!Player.StatsContainer.ContainsKey(Stats.Strength))
+                    {
+                        Player.StatsContainer[Stats.Strength] = _statRolls.Dequeue();
+                    }
+                    else
+                    {
+                        await context.PostAsync($"You have already allocated a {Player.StatsContainer[Stats.Strength]} for Strength!");
+                    }
+                    break;
+                }
+                case "Wisdom":
+                {
+                    if (!Player.StatsContainer.ContainsKey(Stats.Wisdom))
+                    {
+                        Player.StatsContainer[Stats.Wisdom] = _statRolls.Dequeue();
+                    }
+                    else
+                    {
+                        await context.PostAsync($"You have already allocated a {Player.StatsContainer[Stats.Wisdom]} for Wisdom!");
+                    }
+                    break;
+                }
+            }
+
+            context.Wait(MessageReceived);
+        }
+
+
+        #endregion
+
+        #region Player Skills Intent
+
+        // special note: we need to have the class, race, and stats done before we can look at Skills.
+        //PlayerSkills.PopulateContainer();
+        //Player.GetHero = Hero.GetStageTwoHero(DesiredClassType.DesiredClass, DesiredRaceType.DesiredRace, PlayerStats.StatsContainer);
+
+
+        #endregion
+
+        #region Player Feats Intent
+        // special note: we can only do Feats if we have done Skills. 
+        #endregion
+
 
         #region Player Help Intent
 
