@@ -17,6 +17,7 @@ using DnDBot.HeroInformation;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Luis;
 using Microsoft.Bot.Builder.Luis.Models;
+using Microsoft.Bot.Connector;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -679,6 +680,7 @@ namespace DnDBot
                 if (PlayerSkills.SkillsContainer.Count == 0)
                 {
                     PlayerSkills.PopulateContainer();
+                    Player.GetHero = Hero.GetStageTwoHero(Player.DesiredClass, Player.DesiredRace, Player.StatsContainer);
                 }
 
                 if (_skillOptions.Count == 0)
@@ -689,16 +691,22 @@ namespace DnDBot
                     }
                 }
 
-                Player.GetHero = Hero.GetStageTwoHero(Player.DesiredClass, Player.DesiredRace, Player.StatsContainer);
+                if (Player.GetHero.SkillRanksAvailable > 0)
+                {
+                    PromptOptions<string> options = new PromptOptions<string>(
+                        $"What skills would you like your hero to have? You have {Player.GetHero.SkillRanksAvailable} available point(s) to spend.",
+                        "That was not a valid option.",
+                        "You are being silly!",
+                        _skillOptions,
+                        1);
 
-                PromptOptions<string> options = new PromptOptions<string>(
-                    $"What skills would you like your hero to have? You have {Player.GetHero.SkillRanksAvailable} available points to spend.",
-                    "That was not a valid option.",
-                    "You are being silly!",
-                    _skillOptions,
-                    1);
-
-                PromptDialog.Choice(context, PlayerSkill_Dialog, options);
+                    PromptDialog.Choice(context, PlayerSkill_Dialog, options);                    
+                }
+                else
+                {
+                    await context.PostAsync("You have no more skill ranks to place. (use 'new' command to wipe all information)");
+                    context.Wait(MessageReceived);
+                }
             }
         }
 
@@ -881,10 +889,10 @@ namespace DnDBot
 
                 foreach (var stat in Player.StatsContainer)
                 {
-                    sb.AppendLine($"{stat.Key}: {stat.Value}.");
+                    sb.AppendLine($"{stat.Key}: {stat.Value}");
                 }
 
-                await context.PostAsync(sb.ToString());
+                await context.PostAsync($"{sb.ToString()}.");
             }
 
             if (PlayerSkills.SkillsContainer.Count != 0)
@@ -896,9 +904,11 @@ namespace DnDBot
                 {
                     if (skill.NumberOfRanks > 0)
                     {
-                        sb.AppendLine($"{skill.SkillType.ToString()}: {skill.NumberOfRanks}.");
+                        sb.AppendLine($"{skill.SkillType.ToString()}: {skill.NumberOfRanks}");
                     }
                 }
+
+                await context.PostAsync($"{sb.ToString()}.");
             }
 
             if (PlayerFeats.FeatsContainer.Count != 0)
