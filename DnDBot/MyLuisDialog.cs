@@ -34,8 +34,11 @@ namespace DnDBot
     public class MyLuisDialog : LuisDialog<object>
     {
         private string _name = string.Empty;
+        private string _gender = string.Empty;
+        List<string> genderOptions = new List<string>(new string[] { "male", "female", "other", "unknown" });
 
         #region Player Default Intent
+
         /// <summary>
         /// The DefaultHero method is fired when LUIS recognizes terms pertinant to the Defualt Intent.
         /// </summary>
@@ -105,7 +108,7 @@ namespace DnDBot
             }
             else
             {
-                await context.PostAsync("Sorry, I did not recognize a Name value. Maybe I can learn it for next time!");
+                await context.PostAsync("Sorry, I did not recognize a Name value. Maybe I can learn it for next time! Usage: name [value]");
 
                 context.Wait(MessageReceived);
             }           
@@ -134,7 +137,58 @@ namespace DnDBot
 
         #endregion
 
+        #region Player Gender Intent
+
+        /// <summary>
+        /// This PlayerGender method is called when LUIS recognizes the intent 'PlayerGender' being called.
+        /// Intended usage: gender 'desired gender' accepting options: male, female, other, and unknown.
+        /// This method also prompts a yes/no dialog to the user to lock in the name.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{bool}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("PlayerGender")]
+        public async Task PlayerGender(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("I recognized an intent to assign hero gender.");
+
+            PromptOptions<string> options = new PromptOptions<string>(
+                "What gender would you like your hero to be.",
+                "That was not a valid option.",
+                "You are being silly!",
+                genderOptions,
+                2);
+
+            PromptDialog.Choice(context, PlayerGender_Dialog, options);
+        }
+
+        /// <summary>
+        /// The actual setting of our Player objects gender is done through this private asynchronous helper method.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{bool}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task PlayerGender_Dialog(IDialogContext context, IAwaitable<string> result)
+        {
+            string genders = await result;
+
+            if (genderOptions.Contains(genders))
+            {
+                Player.Gender = genders;
+                await context.PostAsync($"So your desired gender: '{Player.Gender}' has been set successfully.");
+            }
+            else
+            {
+                await context.PostAsync($"The gender option: {genders} was incorrect, please use one of the options.");
+            }
+
+            context.Wait(MessageReceived);
+        }
+
+        #endregion
+
         #region Player Help Intent
+
         /// <summary>
         /// The HelpProcess method is fired when LUIS recognizes terms pertinant to the Help Intent.
         /// </summary>
@@ -153,22 +207,22 @@ namespace DnDBot
 
             if (Player.Gender == null)
             {
-                await context.PostAsync("A gender must be set. Use the command 'gender' followed by \"male\", \"female\", or \"other\" to set your hero's gender.");
+                await context.PostAsync("A gender must be set. Use the command 'gender set' to walk through this process.");
             }
 
             if (Player.DesiredAlign == Alignment.None)
             {
-                await context.PostAsync("An alignment must be set. Use the command 'setalign' to walk through this process.");
+                await context.PostAsync("An alignment must be set. Use the command 'align set' to walk through this process.");
             }
 
             if (Player.DesiredClass == ClassType.None)
             {
-                await context.PostAsync("A Player Class must be set. Use the command 'setclass' to walk through this process.");
+                await context.PostAsync("A Player Class must be set. Use the command 'class set' to walk through this process.");
             }
 
             if (Player.DesiredRace == RaceType.None)
             {
-                await context.PostAsync("A Player Race must be set. Use the command 'setrace' to walk through this process.");
+                await context.PostAsync("A Player Race must be set. Use the command 'race set' to walk through this process.");
             }
 
             if (Player.StatsContainer.Count < 6)
@@ -178,12 +232,12 @@ namespace DnDBot
 
             if (PlayerFeats.FeatsContainer.Count == 0)
             {
-                await context.PostAsync("The Players Feats must be set. Use the command 'setfeats' to walk through this process.");
+                await context.PostAsync("The Players Feats must be set. Use the command 'feat set' to walk through this process.");
             }
 
             if (PlayerSkills.SkillsContainer.Count == 0)
             {
-                await context.PostAsync("The Players Skills must be set. Use the command 'setskills' to walk through this process.");
+                await context.PostAsync("The Players Skills must be set. Use the command 'skill set' to walk through this process.");
             }
             
             context.Wait(MessageReceived);
