@@ -1,29 +1,20 @@
-﻿using DnD.Classes.CharacterClasses;
-using DnD.Classes.HeroFeats;
+﻿using DnD.Classes.HeroFeats;
 using DnD.Classes.HeroSkills;
-using DnD.Classes.HeroSpecials;
 using DnD.Classes.Player;
 using DnD.Dice;
 using DnD.Enums.Alignment;
 using DnD.Enums.ClassFeats;
-using DnD.Enums.ClassSkills;
-using DnD.Enums.ClassSpecials;
 using DnD.Enums.ClassTypes;
 using DnD.Enums.Races;
-using DnD.Enums.SavingThrows;
 using DnD.Enums.Stats;
-using DnD.UserStrings;
 using DnDBot.HeroInformation;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Luis;
 using Microsoft.Bot.Builder.Luis.Models;
-using Microsoft.Bot.Connector;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web;
 
 namespace DnDBot
 {
@@ -43,8 +34,10 @@ namespace DnDBot
         private List<string> _classOptions = new List<string>();
         private List<string> _statOptions = new List<string>();
         private List<string> _skillOptions = new List<string>();
+        private List<string> _featOptions = new List<string>();
         private Queue<int> _statRolls = new Queue<int>();
         private string _lastSkillSelected = string.Empty;
+        private string _lastFeatSelected = string.Empty;
 
         #region Player Default Intent
 
@@ -73,51 +66,44 @@ namespace DnDBot
             if (await result)
             {
                 // ensure the hero is in a good state for building off of: default all the properties and collections.
-                //Player.GetHero = null;
-                //Player.Name = null;
-                //Player.Gender = null;
-                //Player.DesiredAlign = Alignment.None;
-                //Player.DesiredClass = ClassType.None;
-                //Player.DesiredRace = RaceType.None;
-                //Player.StatsContainer = new Dictionary<Stats, int>();
-                //PlayerFeats.FeatsContainer = new List<BaseFeat>();
-                //PlayerSkills.SkillsContainer = new List<BaseSkill>();
-
-                //_name = string.Empty;
-                //_gender = string.Empty;
-                //_raceOptions = new List<string>();
-                //_alignOptions = new List<string>();
-                //_classOptions = new List<string>();
-                //_statOptions = new List<string>();
-                //_skillOptions = new List<string>();
-                //_statRolls = new Queue<int>();
-                
-                // for testing.
-                Player.Name = "mario";
-                Player.Gender = "male";
-                Player.DesiredAlign = Alignment.ChaoticEvil;
-                Player.DesiredClass = ClassType.Barbarian;
-                Player.DesiredRace = RaceType.HalfOrc;
-                Player.StatsContainer = new Dictionary<Stats, int>
-                {
-                    { Stats.Charisma, 10 },
-                    { Stats.Constitution, 10 },
-                    { Stats.Dexterity, 10 },
-                    { Stats.Intellect, 10 },
-                    { Stats.Strength, 10 },
-                    { Stats.Wisdom, 10 }
-                };
+                Player.GetHero = null;
+                Player.Name = null;
+                Player.Gender = null;
+                Player.DesiredAlign = Alignment.None;
+                Player.DesiredClass = ClassType.None;
+                Player.DesiredRace = RaceType.None;
+                Player.StatsContainer = new Dictionary<Stats, int>();
                 PlayerFeats.FeatsContainer = new List<BaseFeat>();
                 PlayerSkills.SkillsContainer = new List<BaseSkill>();
 
-                _name = Player.Name;
-                _gender = Player.Gender;
-                //_raceOptions = new List<string>();
-                //_alignOptions = new List<string>();
-                //_classOptions = new List<string>();
-                //_statOptions = new List<string>();
-                //_skillOptions = new List<string>();
-                //_statRolls = new Queue<int>();
+                _name = string.Empty;
+                _gender = string.Empty;
+                _raceOptions = new List<string>();
+                _alignOptions = new List<string>();
+                _classOptions = new List<string>();
+                _statOptions = new List<string>();
+                _skillOptions = new List<string>();
+                _featOptions = new List<string>();
+                _statRolls = new Queue<int>();
+
+                // for testing.
+                //Player.Name = "cheezus";
+                //Player.Gender = "male";
+                //Player.DesiredAlign = Alignment.ChaoticEvil;
+                //Player.DesiredClass = ClassType.Barbarian;
+                //Player.DesiredRace = RaceType.HalfOrc;
+                //Player.StatsContainer = new Dictionary<Stats, int>
+                //{
+                //    { Stats.Charisma, 10 },
+                //    { Stats.Constitution, 10 },
+                //    { Stats.Dexterity, 10 },
+                //    { Stats.Intellect, 10 },
+                //    { Stats.Strength, 10 },
+                //    { Stats.Wisdom, 10 }
+                //};
+
+                //_name = Player.Name;
+                //_gender = Player.Gender;
 
                 await context.PostAsync("All the Properties of the hero have been reset to safe default values. Ready for your next input!");
             }
@@ -892,7 +878,137 @@ namespace DnDBot
         #endregion
 
         #region Player Feats Intent
-        // special note: we can only do Feats if we have done Skills. 
+
+        /// <summary>
+        /// This PlayerFeat method is called when LUIS recognizes the intent 'PlayerFeats' being called.
+        /// Intended usage: feat set. Accepting any of the <see cref="ClassFeats"/> enumeration fields.
+        /// This method also prompts a list of choices to lock in the selected feat.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("PlayerFeats")]
+        public async Task PlayerFeat(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("I recognized an intent to assign hero feats.");
+            
+            // Special note: we must first ensure that the player has allocated all skills before doing feats.
+            if (PlayerSkills.SkillsContainer.Count == 0 || Player.GetHero.SkillRanksAvailable > 0)
+            {
+                await context.PostAsync("In order to set feats, you must first fully allocate all hero skills.");
+                context.Wait(MessageReceived);
+            }
+            else
+            {
+                if (PlayerFeats.FeatsContainer.Count == 0)
+                {
+                    PlayerFeats.PopulateContainer();
+                }
+
+                if (_featOptions.Count == 0)
+                {
+                    foreach (var feat in PlayerFeats.FeatsContainer)
+                    {
+                        _featOptions.Add(feat.FeatType.ToString());
+                    }
+                }
+
+                if (Player.GetHero.FeatsAvailable > 0 || Player.GetHero.BonusFeatsAvailable)                 
+                {
+                    int count = Player.GetHero.FeatsAvailable;
+                    if (Player.GetHero.BonusFeatsAvailable)
+                    {
+                        count++;
+                    }
+
+                    PromptOptions<string> options = new PromptOptions<string>(
+                        $"What feats would you like your hero to acquire? You can acquire {count} feat(s).",
+                        "That was not a valid option.",
+                        "You are being silly!",
+                        _featOptions,
+                        1);
+
+                    PromptDialog.Choice(context, PlayerFeat_Dialog, options);
+                    
+                }
+                else
+                {
+                    await context.PostAsync("You cannot acqure any more feats. (use 'new' command to wipe all information)");
+                    context.Wait(MessageReceived);
+                }
+            }
+        }
+
+        /// <summary>
+        /// This intermediate method accepts a string choice dialog from the user.
+        /// The PlayerFeat_Dialog method then forwards a YES/NO choice dialog
+        /// to the user confirming that this is the correct feat they want to add.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{string}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task PlayerFeat_Dialog(IDialogContext context, IAwaitable<string> result)
+        {
+            _lastFeatSelected = await result;
+            ClassFeats which = (ClassFeats)FeatInformation.GetEnumFromString(_lastFeatSelected);
+            
+            string prereq = FeatInformation.GetPrerequisitesString(which);
+            string description = FeatInformation.GetDescription(which);
+
+            await context.PostAsync($"{_lastFeatSelected} description:");
+            await context.PostAsync($"{description}");
+            await context.PostAsync($"{_lastFeatSelected} prereqs:");
+            await context.PostAsync($"{prereq}");
+
+            PromptDialog.Confirm(context, PlayerFeat_AddFeat, "Do you want to add this feat?");
+        }
+
+        /// <summary>
+        /// The actual setting of our Player objects' feats is done through this private asynchronous helper method.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="IAwaitable{bool}>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        private async Task PlayerFeat_AddFeat(IDialogContext context, IAwaitable<bool> result)
+        {
+            if (await result)
+            {
+                foreach (var feat in PlayerFeats.FeatsContainer)
+                {
+                    if (feat.FeatType.ToString() == _lastFeatSelected)
+                    {
+                        FeatRequirementCheck.CheckIfFeatCanBeAcquired(Player.GetHero, feat);
+
+                        if (feat.CanAcquire && !feat.IsAcquired)
+                        {
+                            if (Player.GetHero.BonusFeatsAvailable)
+                            {
+                                Player.GetHero.BonusFeatsAvailable = false;
+                                FeatRequirementCheck.AcquireTheFeat(feat);
+                                _featOptions.Remove(_lastFeatSelected);
+                                await context.PostAsync($"We acquired the {_lastFeatSelected} feat.");
+                            }
+                            else if (Player.GetHero.FeatsAvailable > 0)
+                            {
+                                Player.GetHero.FeatsAvailable--;
+                                FeatRequirementCheck.AcquireTheFeat(feat);
+                                _featOptions.Remove(_lastFeatSelected);
+                                await context.PostAsync($"We acquired the {_lastFeatSelected} feat.");
+                            }                                                        
+                        }
+
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                await context.PostAsync($"Ok, we wont acquire the {_lastFeatSelected} feat.");
+            }
+
+            context.Wait(MessageReceived);
+        }
+
         #endregion
 
         #region Player Help Intent
@@ -906,7 +1022,7 @@ namespace DnDBot
         [LuisIntent("Help")]
         public async Task HelpProcess(IDialogContext context, LuisResult result)
         {
-            await context.PostAsync("You can use 'show' anytime to display currently set fields");
+            await context.PostAsync("You can use 'show' or 'info' anytime to display currently set fields");
             await context.PostAsync("Lets start from these basic hero fundamentals:");
 
             if (Player.Name == null)
@@ -916,37 +1032,41 @@ namespace DnDBot
 
             if (Player.Gender == null)
             {
-                await context.PostAsync("A gender must be set. Use the command 'gender set' to walk through this process.");
+                await context.PostAsync("A gender must be set. Use the command 'gender' to walk through this process.");
             }
 
             if (Player.DesiredAlign == Alignment.None)
             {
-                await context.PostAsync("An alignment must be set. Use the command 'align set' to walk through this process.");
+                await context.PostAsync("An alignment must be set. Use the command 'align' to walk through this process.");
             }
 
             if (Player.DesiredRace == RaceType.None)
             {
-                await context.PostAsync("A Player Race must be set. Use the command 'race set' to walk through this process.");
+                await context.PostAsync("A Player Race must be set. Use the command 'race' to walk through this process.");
             }
 
             if (Player.DesiredClass == ClassType.None)
             {
-                await context.PostAsync("A Player Class must be set. Use the command 'class set' to walk through this process.");
+                await context.PostAsync("A Player Class must be set. Use the command 'class' to walk through this process.");
             }            
 
             if (Player.StatsContainer.Count < 6)
             {
-                await context.PostAsync("The Players Stats must be set. Use the command 'roll stats' to walk through this process.");
+                await context.PostAsync("The Players Stats must be set. Use the command 'stats' to walk through this process.");
             }
 
             if (Player.GetHero == null || Player.GetHero.SkillRanksAvailable > 0)
             {
-                await context.PostAsync("The Players Skills must be set. Use the command 'skill set' to walk through this process.");
+                await context.PostAsync("The Players Skills must be set. Use the command 'skills or multiple' to walk through this process.");
             }
 
-            if (PlayerFeats.FeatsContainer.Count == 0)
+            if (Player.GetHero == null || Player.GetHero.BonusFeatsAvailable || Player.GetHero.FeatsAvailable > 0)
             {
-                await context.PostAsync("The Players Feats must be set. Use the command 'feat set' to walk through this process.");
+                await context.PostAsync("The Players Feats must be set. Use the command 'feat' to walk through this process.");
+            }
+            else
+            {
+                await context.PostAsync("Your hero is complete! Try the 'save' command to export this hero to a file!");
             }
             
             context.Wait(MessageReceived);
@@ -972,6 +1092,7 @@ namespace DnDBot
 
         /// <summary>
         /// The DisplayInfo method is fired when LUIS recognizes terms pertinant to the Info Intent.
+        /// Usage: 'show' or 'info'.
         /// </summary>
         /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
         /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
@@ -1008,7 +1129,7 @@ namespace DnDBot
 
             if (Player.StatsContainer.Count == 6)
             {
-                await context.PostAsync($"Players' Stats:");
+                await context.PostAsync("Players' Stats:");
                 StringBuilder sb = new StringBuilder();
 
                 foreach (var stat in Player.StatsContainer)
@@ -1021,7 +1142,7 @@ namespace DnDBot
 
             if (PlayerSkills.SkillsContainer.Count != 0)
             {
-                await context.PostAsync($"Players' Skills:");
+                await context.PostAsync("Players' Skills:");
                 StringBuilder sb = new StringBuilder();
 
                 foreach (var skill in PlayerSkills.SkillsContainer)
@@ -1037,12 +1158,66 @@ namespace DnDBot
 
             if (PlayerFeats.FeatsContainer.Count != 0)
             {
-                await context.PostAsync("insert feats message here later.");
+                await context.PostAsync("Players' Feats:");
+                StringBuilder sb = new StringBuilder();
+
+                foreach (var feat in PlayerFeats.FeatsContainer)
+                {
+                    if (feat.IsAcquired)
+                    {
+                        sb.AppendLine($" {feat.FeatType.ToString()} ");
+                    }
+                }
+
+                await context.PostAsync($"{sb.ToString()}.");
             }
 
             context.Wait(MessageReceived);
         }
 
         #endregion
+
+        #region Save Hero Intent
+
+        /// <summary>
+        /// The SaveHero method is fired when LUIS recognizes the intent 'SaveHero' being called.
+        /// Intended usage: save. The Hero must be complete at this point.
+        /// </summary>
+        /// <param name="context">The <see cref="IDialogContext>"/> which is passed in.</param>
+        /// <param name="result">The <see cref="LuisResult>"/> which is passed in.</param>
+        /// <returns>Method awaits the completion of the Posting process.</returns>
+        [LuisIntent("Save")]
+        public async Task SaveHero(IDialogContext context, LuisResult result)
+        {
+            await context.PostAsync("I recognized an intent to save the hero.");
+
+            if (Player.GetHero == null || Player.GetHero.BonusFeatsAvailable || Player.GetHero.FeatsAvailable > 0)
+            {
+                await context.PostAsync("You have not finished placing Feats for your hero. You may not save yet!");
+            }
+            else
+            {
+                // Call Trim on the containers:
+                PlayerFeats.TrimContainer();
+                PlayerSkills.TrimContainer();
+
+                // Set the Static information generated thus far into the Player!
+                // Recall that earlier we used Player.GetHero = Hero.GetStageTwoHero(Player.DesiredClass, Player.DesiredRace, Player.StatsContainer);
+                // which means we already set the class, race, and stats. We still however, need to set the feats, skills, name, and gender!
+                Player.GetHero.PlayerFeats = PlayerFeats.FeatsContainer;
+                Player.GetHero.PlayerSkills = PlayerSkills.SkillsContainer;
+                Player.GetHero.Name = Player.Name;
+                Player.GetHero.Gender = Player.Gender;
+                Player.GetHero.PlayerAlignment = Player.DesiredAlign;
+
+                SaveLoadInfo.Serialize(Player.GetHero);
+
+                await context.PostAsync("Your hero has successfully been saved! Check your desktop in the DnDSaves folder! Thank you.");
+            }
+
+            context.Wait(MessageReceived);
+        }
+
+       #endregion
     }
 }
