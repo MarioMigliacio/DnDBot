@@ -1,11 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.27004.2009
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DnDBot", "DnDBot\DnDBot.csproj", "{DBB4D64D-EC13-4141-B2E5-6A7872ED27AD}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DnD", "..\DnD\DnD\DnD.csproj", "{7445C38E-B529-4473-9CE4-4EAC956BBB56}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,12 +15,11 @@ Global
 		{DBB4D64D-EC13-4141-B2E5-6A7872ED27AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DBB4D64D-EC13-4141-B2E5-6A7872ED27AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DBB4D64D-EC13-4141-B2E5-6A7872ED27AD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7445C38E-B529-4473-9CE4-4EAC956BBB56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7445C38E-B529-4473-9CE4-4EAC956BBB56}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7445C38E-B529-4473-9CE4-4EAC956BBB56}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7445C38E-B529-4473-9CE4-4EAC956BBB56}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {539A3B7A-7624-4248-8A2C-19088A83C13B}
 	EndGlobalSection
 EndGlobal

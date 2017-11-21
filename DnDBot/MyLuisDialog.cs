@@ -1210,7 +1210,7 @@ namespace DnDBot
                 Player.GetHero.Gender = Player.Gender;
                 Player.GetHero.PlayerAlignment = Player.DesiredAlign;
 
-                SaveLoadInfo.Serialize(Player.GetHero);
+                DnD.Classes.Player.SaveLoadInfo.Serialize(Player.GetHero);
 
                 await context.PostAsync("Your hero has successfully been saved! Check your desktop in the DnDSaves folder! Thank you.");
             }
